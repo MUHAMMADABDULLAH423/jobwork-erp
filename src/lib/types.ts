@@ -76,3 +76,26 @@ export interface MonthBill {
   lines: BillLine[];
   created_at: string;
 }
+
+export type GatePassType = "inward" | "outward";
+
+export interface GatePass {
+  id: string;
+  gp_no: string;
+  gp_date: string; // YYYY-MM-DD
+  type: GatePassType;
+  vendor_id: string;
+  inward_id: string | null;
+  outward_id: string | null;
+  vehicle_no: string | null;
+  driver_name: string | null;
+  item_name: string;
+  qty: number;
+  unit: string;
+  purpose: string | null;
+  remarks: string | null;
+  created_at: string;
+  vendor?: Pick<Vendor, "id" | "name" | "phone" | "address"> | null;
+  inward?: { vendor_challan_no: string } | null;
+  outward?: { challan_no: string } | null;
+}
