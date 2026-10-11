@@ -4,10 +4,7 @@ import type { GatePass } from "@/lib/types";
 /** Print-friendly factory gate pass. Rendered inside a .print-only container. */
 export default function GatePassDoc({ pass }: { pass: GatePass }) {
   const v = pass.vendor;
-  const linkedRef =
-    pass.type === "inward"
-      ? pass.inward?.vendor_challan_no ?? null
-      : pass.outward?.challan_no ?? null;
+  const challanRef = pass.challan_ref ?? null;
 
   return (
     <div className="mx-auto max-w-2xl bg-white p-8 text-slate-900">
@@ -39,12 +36,10 @@ export default function GatePassDoc({ pass }: { pass: GatePass }) {
             <span className="text-xs font-semibold uppercase text-slate-500">Date: </span>
             <span>{fmtDate(pass.gp_date)}</span>
           </div>
-          {linkedRef && (
+          {challanRef && (
             <div>
-              <span className="text-xs font-semibold uppercase text-slate-500">
-                {pass.type === "inward" ? "Vendor Challan Ref: " : "Outward Challan Ref: "}
-              </span>
-              <span>{linkedRef}</span>
+              <span className="text-xs font-semibold uppercase text-slate-500">Challan No: </span>
+              <span>{challanRef}</span>
             </div>
           )}
         </div>

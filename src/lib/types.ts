@@ -85,8 +85,7 @@ export interface GatePass {
   gp_date: string; // YYYY-MM-DD
   type: GatePassType;
   vendor_id: string;
-  inward_id: string | null;
-  outward_id: string | null;
+  challan_ref: string | null;
   vehicle_no: string | null;
   driver_name: string | null;
   item_name: string;
@@ -96,6 +95,4 @@ export interface GatePass {
   remarks: string | null;
   created_at: string;
   vendor?: Pick<Vendor, "id" | "name" | "phone" | "address"> | null;
-  inward?: { vendor_challan_no: string } | null;
-  outward?: { challan_no: string } | null;
 }

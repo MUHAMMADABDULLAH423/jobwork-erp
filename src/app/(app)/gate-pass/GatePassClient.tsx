@@ -8,13 +8,13 @@ import {
 } from "@/components/ui";
 import GatePassDoc from "@/components/GatePassDoc";
 import { todayISO, fmtDate, fmtNum } from "@/lib/format";
-import type { Vendor, InwardChallan, OutwardChallan, GatePass, GatePassType } from "@/lib/types";
+import type { Vendor, GatePass, GatePassType } from "@/lib/types";
 
 const emptyForm = {
   type: "outward" as GatePassType,
   gp_date: todayISO(),
   vendor_id: "",
-  link_id: "",
+  challan_ref: "",
   vehicle_no: "",
   driver_name: "",
   item_name: "",
@@ -24,16 +24,7 @@ const emptyForm = {
   remarks: "",
 };
 
-interface LinkOption {
-  id: string;
-  label: string;
-  item_name: string;
-  qty: number;
-  unit: string;
-}
-
-const GP_SELECT =
-  "*, vendor:vendors(id, name, phone, address), inward:inward_challans(vendor_challan_no), outward:outward_challans(challan_no)";
+const GP_SELECT = "*, vendor:vendors(id, name, phone, address)";
 
 export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id" | "name">[] }) {
   const supabase = createClient();
@@ -45,7 +36,6 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
   const [filterVendor, setFilterVendor] = useState("");
   const [filterType, setFilterType] = useState("");
 
-  const [links, setLinks] = useState<LinkOption[]>([]);
   const [printItem, setPrintItem] = useState<GatePass | null>(null);
 
   async function loadList() {
@@ -67,66 +57,6 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
     loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterVendor, filterType]);
-
-  // Load linkable challans whenever the pass type or vendor changes
-  useEffect(() => {
-    async function loadLinks() {
-      if (!form.vendor_id) {
-        setLinks([]);
-        return;
-      }
-      if (form.type === "inward") {
-        const { data } = await supabase
-          .from("inward_challans")
-          .select("id, vendor_challan_no, challan_date, item_name, qty, unit, status")
-          .eq("vendor_id", form.vendor_id)
-          .order("challan_date", { ascending: false })
-          .limit(100);
-        setLinks(
-          ((data ?? []) as InwardChallan[]).map((c) => ({
-            id: c.id,
-            label: `${c.vendor_challan_no} — ${c.item_name} (${fmtNum(c.qty)} ${c.unit}) — ${fmtDate(c.challan_date)} [${c.status}]`,
-            item_name: c.item_name,
-            qty: Number(c.qty),
-            unit: c.unit,
-          }))
-        );
-      } else {
-        const { data } = await supabase
-          .from("outward_challans")
-          .select("id, challan_no, challan_date, item_name, qty, unit")
-          .eq("vendor_id", form.vendor_id)
-          .order("challan_date", { ascending: false })
-          .limit(100);
-        setLinks(
-          ((data ?? []) as OutwardChallan[]).map((c) => ({
-            id: c.id,
-            label: `${c.challan_no} — ${c.item_name} (${fmtNum(c.qty)} ${c.unit}) — ${fmtDate(c.challan_date)}`,
-            item_name: c.item_name,
-            qty: Number(c.qty),
-            unit: c.unit,
-          }))
-        );
-      }
-    }
-    loadLinks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.type, form.vendor_id]);
-
-  function onLinkSelect(linkId: string) {
-    const opt = links.find((l) => l.id === linkId);
-    if (!opt) {
-      setForm((f) => ({ ...f, link_id: "" }));
-      return;
-    }
-    setForm((f) => ({
-      ...f,
-      link_id: opt.id,
-      item_name: opt.item_name,
-      qty: String(opt.qty),
-      unit: opt.unit,
-    }));
-  }
 
   const qtyNum = parseFloat(form.qty);
 
@@ -158,8 +88,7 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
       gp_date: form.gp_date,
       type: form.type,
       vendor_id: form.vendor_id,
-      inward_id: form.type === "inward" ? form.link_id || null : null,
-      outward_id: form.type === "outward" ? form.link_id || null : null,
+      challan_ref: form.challan_ref.trim() || null,
       vehicle_no: form.vehicle_no.trim() || null,
       driver_name: form.driver_name.trim() || null,
       item_name: form.item_name.trim(),
@@ -178,7 +107,7 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
     const savedVendorId = form.vendor_id;
     setForm({ ...emptyForm, type: savedType, vendor_id: savedVendorId });
     await loadList();
-    // Load the saved pass with vendor + linked challan details for the printout
+    // Load the saved pass with vendor details for the printout
     if (data) {
       const { data: full } = await supabase
         .from("gate_passes")
@@ -204,9 +133,8 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
     };
   }, [printItem]);
 
-  function linkedRef(g: GatePass): string {
-    if (g.type === "inward") return g.inward?.vendor_challan_no ?? "—";
-    return g.outward?.challan_no ?? "—";
+  function challanRef(g: GatePass): string {
+    return g.challan_ref ?? "—";
   }
 
   return (
@@ -230,7 +158,7 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
                 <SelectInput
                   value={form.type}
                   onChange={(e) =>
-                    setForm({ ...form, type: e.target.value as GatePassType, link_id: "" })
+                    setForm({ ...form, type: e.target.value as GatePassType })
                   }
                 >
                   <option value="outward">Outward — material going out</option>
@@ -251,16 +179,8 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
                   ))}
                 </SelectInput>
               </Field>
-              <Field
-                label="Link challan (optional)"
-                hint={form.type === "inward" ? "Autofills item and qty from the inward challan." : "Autofills item and qty from the outward challan."}
-              >
-                <SelectInput value={form.link_id} onChange={(e) => onLinkSelect(e.target.value)} disabled={!form.vendor_id}>
-                  <option value="">— No link —</option>
-                  {links.map((l) => (
-                    <option key={l.id} value={l.id}>{l.label}</option>
-                  ))}
-                </SelectInput>
+              <Field label="Challan No.">
+                <TextInput value={form.challan_ref} onChange={(e) => setForm({ ...form, challan_ref: e.target.value })} placeholder="Vendor's challan no. or your challan no." />
               </Field>
               <Field label="Vehicle No.">
                 <TextInput value={form.vehicle_no} onChange={(e) => setForm({ ...form, vehicle_no: e.target.value })} placeholder="e.g. KHI-1234" />
@@ -344,7 +264,7 @@ export default function GatePassClient({ vendors }: { vendors: Pick<Vendor, "id"
                         <Td>{g.vehicle_no ?? "—"}</Td>
                         <Td>{g.item_name}</Td>
                         <Td>{fmtNum(g.qty)} {g.unit}</Td>
-                        <Td>{linkedRef(g)}</Td>
+                        <Td>{challanRef(g)}</Td>
                         <Td>
                           <button onClick={() => doPrint(g)} className="text-xs font-semibold text-brand-600 hover:underline">
                             Print

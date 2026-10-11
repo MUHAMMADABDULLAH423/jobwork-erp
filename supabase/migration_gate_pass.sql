@@ -2,7 +2,8 @@
 -- Job-Work Factory ERP — migration: gate passes
 -- Run this file once in the Supabase SQL editor (after schema.sql).
 -- Gate passes are the factory gate movement slips for material coming in
--- (inward) or going out (outward): vehicle no, driver, linked challan.
+-- (inward) or going out (outward): vehicle no, driver, and the challan
+-- number written manually (no link to challan records).
 -- ============================================================================
 
 create table if not exists gate_passes (
@@ -11,8 +12,7 @@ create table if not exists gate_passes (
   gp_date date not null,
   type text not null check (type in ('inward', 'outward')),
   vendor_id uuid not null references vendors(id) on delete cascade,
-  inward_id uuid references inward_challans(id) on delete set null,
-  outward_id uuid references outward_challans(id) on delete set null,
+  challan_ref text,
   vehicle_no text,
   driver_name text,
   item_name text not null,
